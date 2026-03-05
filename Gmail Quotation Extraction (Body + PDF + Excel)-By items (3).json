@@ -1,0 +1,1155 @@
+{
+  "name": "Gmail Quotation Extraction (Body + PDF + Excel)-By items",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $('Gmail Reader').item.json.id }}",
+        "simple": false,
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -1376,
+        -32
+      ],
+      "id": "da1e2f4a-d02a-4a4c-899e-1971f271d65c",
+      "name": "Get a message",
+      "webhookId": "96458f2a-8ddf-4c46-a4d5-777e7f292dda",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "lmliLnYEoiCzn35e",
+          "name": "Purchase Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -576,
+        -192
+      ],
+      "id": "4cc30045-4ebf-4dc8-acf9-7095e2b42eb1",
+      "name": "XLXS Extractor"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -576,
+        112
+      ],
+      "id": "1f38053b-3155-4a22-8a7a-eae1527d96a5",
+      "name": "PDF Extractor",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour",
+              "minute": 30
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2048,
+        112
+      ],
+      "id": "d77a62fc-af05-4763-9bf1-fa065d24a2c6",
+      "name": "Gmail Reader",
+      "alwaysOutputData": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "lmliLnYEoiCzn35e",
+          "name": "Purchase Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        80,
+        -64
+      ],
+      "id": "2c31358c-9548-455c-aa14-557e4072204d",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "Rqcfgashr16EVDON",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert quotation and invoice extraction agent.\n\nYou will receive raw extracted content from a quotation document.\nThe content may come from PDF or Excel and may be unstructured,\ncontain tables, headers, metadata, discounts, notes, and noise.\n\nYour task is to accurately extract and compute commercial data.\n\n--------------------------------\nFIELDS TO EXTRACT\n--------------------------------\n1. vendorName\n   - The company issuing the quotation (seller / supplier).\n   - Ignore client name, buyer name, or delivery address.\n\n2. items\n   - Extract ALL line items.\n   - For each item, extract:\n     - itemName\n     - quantity (default to 1 if not explicitly mentioned)\n     - unitRate (before discount)\n     - discountPercent (0 if not mentioned)\n     - lineAmount = quantity × unitRate × (1 − discountPercent/100)\n\n3. quotationAmount\n   - This must be the FINAL payable amount.\n   - If GST / tax is mentioned (e.g. “GST Extra @18%”), apply it on subtotal.\n   - If tax is NOT mentioned, assume quotationAmount excludes tax.\n   - Round monetary values to 2 decimal places.\n\n--------------------------------\nIMPORTANT RULES (STRICT)\n--------------------------------\n- Ignore headers, branding, footers, terms, validity, and notes.\n- Do NOT hallucinate missing values.\n- If something is not found, return null.\n- If multiple totals appear, choose the FINAL payable total.\n- If total is not explicitly stated, calculate it logically.\n- Perform all calculations silently.\n- Internally verify:\n  quotationAmount = sum(lineAmount) + applicable tax\n- If mismatch is detected, recalculate BEFORE responding.\n\n--------------------------------\nOUTPUT FORMAT (STRICT)\n--------------------------------\nReturn ONLY ONE valid JSON object.\nDo NOT return explanations, steps, comments, markdown, or extra text.\n\nJSON format:\n{\n  \"vendorName\": \"\",\n  \"quotationAmount\": 0,\n  \"items\": [\n    {\n      \"itemName\": \"\",\n      \"quantity\": 0,\n      \"unitRate\": 0,\n      \"discountPercent\": 0,\n      \"lineAmount\": 0\n    }\n  ]\n}\n\n--------------------------------\nDOCUMENT CONTENT\n--------------------------------\n\n{{ $json.body_text }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1152,
+        416
+      ],
+      "id": "7992b86d-6eeb-44d5-950f-551928ecead2",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1152,
+        592
+      ],
+      "id": "78d5d2fe-fe07-44f2-97a4-497bce6a6d25",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Rqcfgashr16EVDON",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\n\nlet combined = \"\";\n\nfor (const r of rows) {\n  combined += JSON.stringify(r.json) + \"\\n\";\n}\n\nreturn [\n  {\n    json: {\n      documentText: combined\n    }\n  }\n];\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        -192
+      ],
+      "id": "a3b21c5f-b3d7-4f66-8a89-82403473ac5a",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.flatMap(item => {\n  const binaries = item.binary || {};\n\n  return Object.keys(binaries).map(key => {\n    return {\n      json: {\n        fileName: binaries[key].fileName,\n        mimeType: binaries[key].mimeType,\n        fileType: binaries[key].fileType,\n        fileExtension: binaries[key].fileExtension,\n        fileSize: binaries[key].fileSize,\n        key,\n        from: item.json.from,\n        to: item.json.to,\n        subject: item.json.subject || \"\",\n        date: item.json.date\n      },\n      \n      binary: {\n        data: binaries[key]\n      }\n    };\n  });\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        -32
+      ],
+      "id": "067032f2-569d-4c4f-ab23-92b4891e7d9f",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const mail = item.json;\n  const binary = item.binary || {};\n\n  const attachments = [];\n  const filteredBinary = {};\n\n  Object.keys(binary).forEach(key => {\n    const mimeType = binary[key].mimeType || '';\n\n    // ❌ Skip image attachments\n    if (mimeType.startsWith('image/')) return;\n\n    // ✅ Keep non-image attachments\n    attachments.push({\n      binaryKey: key,\n      fileName: binary[key].fileName,\n      mimeType: mimeType,\n      fileSize: binary[key].fileSize,\n    });\n\n    filteredBinary[key] = binary[key];\n  });\n\n  return {\n    json: {\n      email_from_name: mail.from?.value?.[0]?.name || null,\n      email_from_address: mail.from?.value?.[0]?.address || null,\n      subject: mail.headers?.subject || '',\n      body_text: mail.text || mail.html || '',\n      attachments, // non-image metadata only\n      received_date: mail.date || null,\n    },\n    binary: filteredBinary // ✅ images fully removed\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1824,
+        112
+      ],
+      "id": "16ca1c56-0f3d-45d7-b43a-5acb77f547a0",
+      "name": "Code in Javascript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  let html =\n    item.json.html ||\n    item.json.body?.html ||\n    item.json.payload?.body?.html ||\n    '';\n\n  let text =\n    item.json.text ||\n    item.json.body?.text ||\n    item.json.payload?.body?.text ||\n    '';\n\n  if (html) {\n    text = html\n      .replace(/<script[\\s\\S]*?>[\\s\\S]*?<\\/script>/gi, '')\n      .replace(/<style[\\s\\S]*?>[\\s\\S]*?<\\/style>/gi, '')\n      .replace(/<br\\s*\\/?>/gi, '\\n')\n      .replace(/<\\/p>/gi, '\\n')\n      .replace(/<[^>]+>/g, '')\n      .replace(/&nbsp;/gi, ' ')\n      .replace(/&amp;/gi, '&')\n      .replace(/&lt;/gi, '<')\n      .replace(/&gt;/gi, '>')\n      .replace(/&quot;/gi, '\"')\n      .replace(/&#39;/gi, \"'\")\n      .replace(/\\r\\n/g, '\\n')\n      .replace(/\\n{2,}/g, '\\n')\n      .trim();\n  }\n\n  return {\n    json: {\n      ...item.json,\n      email_text: text,\n    },\n    binary: item.binary, \n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1376,
+        416
+      ],
+      "id": "fe99be78-4077-4d1e-b60b-19a012d1f57f",
+      "name": "Code in Javascript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "let parsed;\n\ntry {\n  parsed = JSON.parse($json.output);\n} catch {\n  throw new Error(\"AI output is not valid JSON\");\n}\n\nconst items = parsed.items || [];\nif (!items.length) {\n  throw new Error(\"No items found in quotation\");\n}\n\n// Subtotal\nconst subtotal = items.reduce((s, i) => s + Number(i.lineAmount), 0);\n\n// Apply GST if mentioned in document (we assume yes here)\n// const gstRate = 0.18;\n// const gstAmount = +(subtotal * gstRate).toFixed(2);\n// const finalTotal = +(subtotal + gstAmount).toFixed(2);\n\n\n// parsed.subtotal = +subtotal.toFixed(2);\n// parsed.gstAmount = gstAmount;\n// parsed.quotationAmount = finalTotal;\n\n// Return normalized object\nreturn {\n  vendorName: parsed.vendorName,\n  // subtotal: parsed.subtotal,\n  // gstAmount: parsed.gstAmount,\n  // quotationAmount: parsed.quotationAmount,\n  items\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        416
+      ],
+      "id": "e0a42c86-bc76-4507-b69f-c37cd7c9a4e0",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f783eb23-b5b2-49f6-a12c-a36db56bb794",
+              "leftValue": "={{  $('Code in Javascript1').item.binary }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b2c05b55-c009-4797-bfc5-fffdadb18d51",
+              "leftValue": "={{ $json.attachments }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1600,
+        112
+      ],
+      "id": "dad87a4f-f3fc-4cb6-9cd7-6a9f77b7c2ac",
+      "name": "If "
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $binary.data.mimeType }}",
+                    "rightValue": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e1c897f3-571d-47ca-bd2d-135de42625dd"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "95b49c17-11b0-4374-9301-6c3382341800",
+                    "leftValue": "={{ $binary.data.mimeType }}",
+                    "rightValue": "xls",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "11b19260-e65a-4c9c-9954-c9e544e0f5e7",
+                    "leftValue": "={{ $binary.data.mimeType }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b8c1fb3b-0dde-4fb3-a95b-673d7f2dc28e",
+                    "leftValue": "={{ $binary.data.mimeType }}",
+                    "rightValue": "application/pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -800,
+        -64
+      ],
+      "id": "d77b64f8-03ef-43ae-aa00-11f92455e3fd",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert quotation and invoice extraction agent.\n\nYou will receive raw extracted content from a quotation document.\nThe content may be unstructured and noisy.\n\nYour task:\n- Identify the vendor/company issuing the quotation.\n- Identify all line items.\n- Identify the FINAL payable quotation amount.\n- Include GST only if explicitly mentioned.\n- Ignore headers, branding, and notes.\n\nSTRICT RULES:\n- Return ONLY ONE JSON object.\n- Do NOT include explanations, comments, markdown, or extra text.\n- Do NOT correct yourself after outputting JSON.\n- Do NOT include multiple JSON blocks.\n- If multiple totals exist, choose the FINAL payable amount.\n- If a value is missing, use 0.\n- Do NOT hallucinate values.\n\nOUTPUT FORMAT (VALID JSON ONLY):\n\n{\n  \"vendorName\": \"string\",\n  \"quotationAmount\": number,\n  \"items\": [\n    {\n      \"itemName\": \"string\",\n      \"Quantity\": number,\n      \"Unit Rate\": number,\n      \"DiscountPercent\": number,\n      \"Total Amount\": number\n    }\n  ]\n}\n\nDocument content:\n{{ $json.documentText }}\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        0,
+        -288
+      ],
+      "id": "23a6cf99-8c4d-449f-aaa9-c0cb94ad1d72",
+      "name": "AI Agent2"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54",
+          "mode": "list",
+          "cachedResultName": "Quotation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1299940531,
+          "mode": "list",
+          "cachedResultName": "BodyQuotation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54/edit#gid=1299940531"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Vendor Name": "={{ $json.vendorName }}",
+            "Item Name": "={{ $json.items.itemName }}",
+            "Quantity": "={{ $json.items.quantity }}",
+            "Unit Rate": "={{ $json.items.unitRate }}",
+            "DiscountPercent": "={{ $json.items.discountPercent }}",
+            "Total Amount": "={{ $json.items.lineAmount }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Vendor Name",
+              "displayName": "Vendor Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Item Name",
+              "displayName": "Item Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Unit Rate",
+              "displayName": "Unit Rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DiscountPercent",
+              "displayName": "DiscountPercent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total Amount",
+              "displayName": "Total Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -288,
+        416
+      ],
+      "id": "b6806ef9-3fda-4d11-a0f3-25e110fdc644",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QmkqqpeZqhdX46BJ",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54",
+          "mode": "list",
+          "cachedResultName": "Quotation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "PDFQuotations",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Vendor Name": "={{ $json.vendorName }}",
+            "Item Name": "={{ $json.itemName }}",
+            "Quantity": "={{ $json.quantity }}",
+            "Unit Rate": "={{ $json.unitRate }}",
+            "DiscountPercent": "={{ $json.discountPercent }}",
+            "Total Amount": "={{ $json.lineAmount }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Vendor Name",
+              "displayName": "Vendor Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Item Name",
+              "displayName": "Item Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Unit Rate",
+              "displayName": "Unit Rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DiscountPercent",
+              "displayName": "DiscountPercent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total Amount",
+              "displayName": "Total Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        352,
+        112
+      ],
+      "id": "f763f0fb-1cb7-45a9-aafd-b1948fb29478",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "hdEUIKvsUehkbUfe",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54",
+          "mode": "list",
+          "cachedResultName": "Quotation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 813220475,
+          "mode": "list",
+          "cachedResultName": "XlxsQuotation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1u1_rEZ-ilKlRb4BX7qbcEdnJxHGIlARZFrMk8avuu54/edit#gid=813220475"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Vendor Name": "={{ $json['Vendor Name'] }}",
+            "Item Name": "={{ $json['Item Name'] }}",
+            "Quantity": "={{ $json.Quantity }}",
+            "Unit Rate": "={{ $json['Unit Rate'] }}",
+            "DiscountPercent": "={{ $json.DiscountPercent }}",
+            "Total Amount": "={{ $json['Total Amount'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Vendor Name",
+              "displayName": "Vendor Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Item Name",
+              "displayName": "Item Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Unit Rate",
+              "displayName": "Unit Rate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DiscountPercent",
+              "displayName": "DiscountPercent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total Amount",
+              "displayName": "Total Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        576,
+        -192
+      ],
+      "id": "b4427bd2-91a3-4a68-8c79-d240f73268a8",
+      "name": "Append row in sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "hdEUIKvsUehkbUfe",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        416
+      ],
+      "id": "29a56696-6bf5-49d5-a65d-57513c8ec25e",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "jsCode": "let parsed;\n\ntry {\n  parsed = JSON.parse($input.first().json.output);\n} catch (e) {\n  throw new Error(\"AI output is not valid JSON\");\n}\n\nconst vendorName = parsed.vendorName || \"\";\nconst items = parsed.items || [];\n\nif (!items.length) {\n  throw new Error(\"No items found in quotation\");\n}\n\n// Convert each item into a row for Google Sheets\nconst rows = items.map(item => ({\n  json: {\n    \"Vendor Name\": vendorName,\n    \"Item Name\": item.itemName || item.itemNames || \"\",\n    \"Quantity\": item.Quantity || 0,\n    \"Unit Rate\": item[\"Unit Rate\"] || item.UnitRate || 0,\n    \"DiscountPercent\": item.DiscountPercent || 0,\n    \"Total Amount\": item[\"Total Amount\"] || item.TotalAmount || 0,\n  }\n}));\n\nreturn rows;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        -192
+      ],
+      "id": "dca4c02a-5403-4cd1-8536-60653817d7f8",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a data extraction agent.\n\nExtract information ONLY from the provided quotation text.\nDo NOT guess, assume, or infer missing values.\nIf a value is not explicitly present, return null.\n\nReturn STRICT JSON ONLY in the following structure:\n\n{\n  \"vendorName\": string | null,\n  \"items\": [\n    {\n      \"itemName\": string | null,\n      \"quantity\": number | null,\n      \"unitRate\": number | null,\n      \"discountPercent\": number,\n      \"lineAmount\": number | null\n    }\n  ]\n}\n\nRules:\n- vendorName = company issuing the quotation (seller), not the client\n- quantity defaults to 1 ONLY if quantity column exists but is empty\n- discountPercent = 0 if not explicitly mentioned\n- unitRate must be the per-unit price before discount\n- lineAmount must match the amount shown in the quotation\n- Extract ALL line items\n- JSON only, no comments, no formatting\n\nQuotation text:\n{{ $json.text }}\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -352,
+        16
+      ],
+      "id": "c6a5767c-d830-49c9-ad1b-14c734501dd9",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -288,
+        240
+      ],
+      "id": "31a8e6bc-b763-4aee-9c99-6c6b10779a1f",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "Rqcfgashr16EVDON",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Safely reach the AI text output\nconst text =\n  $input.first().json.output;\n\nif (!text) {\n  throw new Error(\"AI text output not found\");\n}\n\n// 2. Remove ```json ``` markdown fences\nconst cleaned = text\n  .replace(/```json/i, \"\")\n  .replace(/```/g, \"\")\n  .trim();\n\n// 3. Parse JSON\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  throw new Error(\"Cleaned AI output is not valid JSON\");\n}\n\n// 4. Validate structure\nif (!Array.isArray(parsed.items)) {\n  throw new Error(\"Items array missing\");\n}\n\n// 5. Split items into individual n8n items\nreturn parsed.items.map(item => ({\n  json: {\n    vendorName: parsed.vendorName ?? null,\n    itemName: item.itemName ?? null,\n    quantity: item.quantity ?? null,\n    unitRate: item.unitRate ?? null,\n    discountPercent: item.discountPercent ?? 0,\n    lineAmount: item.lineAmount ?? null\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        112
+      ],
+      "id": "328ed843-f7bc-47f1-8410-086ce5a8edc4",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "14ePkgs9_PMbZ7jxvt3s3C3qKUl-ykaXbvNjhA_q8DLM",
+          "mode": "list",
+          "cachedResultName": "Email_Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14ePkgs9_PMbZ7jxvt3s3C3qKUl-ykaXbvNjhA_q8DLM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/14ePkgs9_PMbZ7jxvt3s3C3qKUl-ykaXbvNjhA_q8DLM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Received At": "={{ $json.received_date }}",
+            "From Name": "={{ $json.email_from_name }}",
+            "From Email": "={{ $json.email_from_address }}",
+            "Subject": "={{ $json.subject }}",
+            "Body": "={{ $json.body_text }}",
+            "Attachment ": "={{ $json.attachments }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Received At",
+              "displayName": "Received At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "From Name",
+              "displayName": "From Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "From Email",
+              "displayName": "From Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Body",
+              "displayName": "Body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Attachment ",
+              "displayName": "Attachment ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1648,
+        368
+      ],
+      "id": "ef7baef8-0142-4045-81ab-192da944e9e2",
+      "name": "Append row in sheet3",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rzaUxJ4vPKV6eQ9T",
+          "name": "MIS Account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get a message": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XLXS Extractor": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Extractor": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Reader": {
+      "main": [
+        [
+          {
+            "node": "Code in Javascript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Javascript1": {
+      "main": [
+        [
+          {
+            "node": "If ",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in Javascript2": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If ": {
+      "main": [
+        [
+          {
+            "node": "Get a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in Javascript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "XLXS Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "XLXS Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PDF Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PDF Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "111de366-613f-4512-a674-383be7773961",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4747b1f396217a4243fb789b4622a449c2ab8c50599a4e259ba0f50f230bced5"
+  },
+  "id": "xyrofVqed-d9jTkOVsZFA",
+  "tags": []
+}
