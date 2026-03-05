@@ -1,0 +1,621 @@
+{
+  "name": "ARPITA_Mail",
+  "nodes": [
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1sFd8GopZlFeGsfXDRfSFATFUqRtq2i6ayDaP9Im98EQ/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 856858336,
+          "mode": "list",
+          "cachedResultName": "ARPITA",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sFd8GopZlFeGsfXDRfSFATFUqRtq2i6ayDaP9Im98EQ/edit#gid=856858336"
+        },
+        "options": {}
+      },
+      "name": "Read Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -512,
+        400
+      ],
+      "id": "43df04db-cd31-4c56-bc61-e9d6df450563",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Prl3J3spbbOJfXum",
+          "name": "MIS Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8bd0cb22-3ca9-4b47-9ce5-3496d8731a5d",
+              "leftValue": "={{ $json['Mail Status'] }}",
+              "rightValue": "=false",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -352,
+        400
+      ],
+      "id": "2aa82052-ce0f-498d-80a0-48405efcccd7",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const grouped = {};\nconst items = $input.all();\n\nfor (const item of items) {\n  const rawEmails = item.json[\"Party Mail Address\"];\n  if (!rawEmails) continue;\n\n  const emails = rawEmails\n    .split(/[,;]+/)\n    .map(e => e.trim().toLowerCase())\n    .filter(Boolean);\n\n  for (const email of emails) {\n    if (!grouped[email]) {\n      grouped[email] = {\n        rows: [],\n        row_numbers: []\n      };\n    }\n\n    grouped[email].rows.push(item.json);\n    grouped[email].row_numbers.push(item.json.row_number);\n  }\n}\n\nreturn Object.keys(grouped).map(email => ({\n  json: {\n    email,\n    rows: grouped[email].rows,\n    row_numbers: grouped[email].row_numbers\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        384
+      ],
+      "id": "0d0325d8-673f-4721-bb10-d63d8dc01c68",
+      "name": "Group by Party Mail Address"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const rows = item.json.rows;\n\n  let table = `\n<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%\">\n<tr>\n  <th>Item No</th>\n  <th>Item Description</th>\n  <th>UOM</th>\n  <th>Total Qty</th>\n</tr>`;\n\n  for (const r of rows) {\n    table += `\n<tr>\n  <td>${r[\"Item No\"]}</td>\n  <td>${r[\"Item Description\"]}</td>\n  <td>${r[\"UOM\"]}</td>\n  <td>${r[\"Total QTY\"]}</td>\n</tr>`;\n  }\n\n  table += `</table>`;\n\n  // ✅ take from FIRST row of this email group\n  const executivePhone = rows[0][\"Executive Phone Number\"] || \"\";\n  const shortenLink = rows[0][\"Shorten Link\"] || \"\";\n\n  output.push({\n    json: {\n      email: item.json.email,\n      table,\n      rows: item.json.rows,\n      row_numbers: item.json.row_numbers,\n      executivePhone,\n      shortenLink\n    }\n  });\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e6900662-10d0-4b17-96eb-a2be63e89c18",
+      "name": "Build Multiple Item Table"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a procurement executive.\n\nYou MUST return a valid JSON object and NOTHING ELSE.\nDo NOT add explanations, comments, or text outside JSON.\nDo NOT use markdown.\nDo NOT add line breaks before or after JSON.\n\nYour task:\nWrite a professional RFQ email for multiple items.\n\nEmail rules:\n- Start email body with: Dear Sir, Write it in separate line\n- Mention the RFQ is for MULTIPLE items\n- Ask for unit price, total price, lead time, applicable taxes. Quotation validity is 3 days\n- Refer to the item details table provided below\n\n\nJSON FORMAT (STRICT — NO DEVIATION):\n\n{\n  \"email_subject\": \"Request for Quotation – Multiple Items\",\n  \"email_body\": \"Dear Sir,\\n\\nWe request you to kindly provide your quotation for multiple items as per the item details table provided below.\\n\\nPlease mention the unit price, total price, lead time, applicable taxes, and please confirm since our quotation validity is 3 days.\\n\\nWe look forward to your prompt response.\"\n}\n\n\n}\n\n",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "e8744726-e99e-451c-947a-952fda6c5698",
+      "name": " AI – Draft RFQ Email"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        176
+      ],
+      "id": "c8449b27-4725-425a-9faf-5a4c00d17ae6",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "JV2aEQqYQl52w1y7",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cd7d9e52-f86e-4c9e-a7d7-b974fc93a7f9",
+              "name": "output.email_subject",
+              "value": "={{ $json.output.email_subject }}",
+              "type": "string"
+            },
+            {
+              "id": "5ae5539d-6249-4b5e-b8f4-217ebc0a2de6",
+              "name": "output.email_body",
+              "value": "={{ $json.output.email_body }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        640,
+        0
+      ],
+      "id": "6842d71f-639c-468c-8b13-97a2577a7486",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Build Multiple Item Table').item.json.email }}",
+        "subject": "={{ $(' AI – Draft RFQ Email').item.json.output.email_subject }}",
+        "message": "=={{ $(' AI – Draft RFQ Email').item.json.output.email_body.replace(/\\n/g, '<br>') }}\n\n<br><br>\n<b>Item Details:</b><br><br>\n\n{{ $('Build Multiple Item Table').item.json.table }}\n\n<br><br>\n\n{{ \n  $('Build Multiple Item Table').item.json.shortenLink\n    ? `<b>Image link is given below for details:</b><br>\n       <a href=\"${$('Build Multiple Item Table').item.json.shortenLink}\" target=\"_blank\">\n       ${$('Build Multiple Item Table').item.json.shortenLink}</a><br><br>`\n    : ''\n}}\n\n<hr style=\"border:none;border-top:1px solid #ddd;width:220px\">\n\n<img src=\"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSCQQdQmFFWAeqU4kZyo6zEUMCtZNxIcLxZfA&s\" width=\"140\"><br><br>\n\n<b>Purchase Executive</b><br>\nHemraj Group<br>\n📞 {{ $('Build Multiple Item Table').item.json.executivePhone }}<br>\n✉️ hemrajpurchase@hemrajgroup.co.in<br>\n🌐 <a href=\"https://hemrajgroup.co.in/\">hemrajgroup.co.in</a>\n\n{{ $json.companySignature }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        0
+      ],
+      "id": "2ec2a393-a59b-4302-8d83-b1649ae171a8",
+      "name": "Send a message",
+      "webhookId": "e5c83518-208f-4402-9c34-2fa16ad0b8ab",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gaeAyD6gS0GcZwdD",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1sFd8GopZlFeGsfXDRfSFATFUqRtq2i6ayDaP9Im98EQ/edit?gid=0#gid=0",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 856858336,
+          "mode": "list",
+          "cachedResultName": "ARPITA",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sFd8GopZlFeGsfXDRfSFATFUqRtq2i6ayDaP9Im98EQ/edit#gid=856858336"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Mail Status": "={{ $json[\"Mail Status\"] }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Site",
+              "displayName": "Site",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Unique Id",
+              "displayName": "Unique Id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "I.N",
+              "displayName": "I.N",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Item No",
+              "displayName": "Item No",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Item Description",
+              "displayName": "Item Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "UOM",
+              "displayName": "UOM",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Total QTY",
+              "displayName": "Total QTY",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Party Name",
+              "displayName": "Party Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Required By Date",
+              "displayName": "Required By Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Selected Party Name",
+              "displayName": "Selected Party Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Party Mail Address",
+              "displayName": "Party Mail Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Mail Status",
+              "displayName": "Mail Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        592
+      ],
+      "id": "ab7a027a-fb58-4ff1-90e7-908a5862912c",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Prl3J3spbbOJfXum",
+          "name": "MIS Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst updates = [];\n\nfor (const item of items) {\n  // Only process items that have row_numbers\n  if (!Array.isArray(item.json.row_numbers)) continue;\n\n  for (const row of item.json.row_numbers) {\n    updates.push({\n      json: {\n        row_number: row,\n        \"Mail Status\": true,\n        \"Timestamp\": new Date().toISOString()\n      }\n    });\n  }\n}\n\nreturn updates;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        592
+      ],
+      "id": "2c417512-a569-44aa-96a6-382afbad4940",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        400,
+        592
+      ],
+      "id": "1c5ddd25-ec33-4777-bb52-2b25826b6267",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string\"\n}\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        176
+      ],
+      "id": "6824f1fb-240b-4259-9f23-a0470562f5e6",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtMinute": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -736,
+        400
+      ],
+      "id": "9ee74ecb-c202-4a08-843b-5e2a8c7ff7c6",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Get Mail Signature value directly from original sheet data\nconst mailSignature = $('Read Google Sheet').first().json['Mail Signature'] || \"\";\n\nlet companyBlock = \"\";\n\nif (mailSignature === \"HEMRAJ INDUSTRIES PVT LTD\") {\n  companyBlock = `\n  <br><br>\n  <b>HEMRAJ INDUSTRIES PVT LTD</b><br>\n  Factory Address: P.O+Vill: Chandul,G.T. Road, Purba Bardhaman, 713141, West Bengal<br>\n  GSTIN: 19AAACH8249K1Z4 &nbsp;&nbsp; PAN: AAACH8249K\n  `;\n}\n\nelse if (mailSignature === \"HEMRAJ RICE MILL\") {\n  companyBlock = `\n  <br><br>\n  <b>HEMRAJ RICE MILL</b><br>\n  Factory Address: Katwa Burdwan Road, Katwa, Purba Bardhaman, 713130, West Bengal<br>\n  GSTIN: 19AADFH4153N1Z2 &nbsp;&nbsp; PAN: AADFH4153N\n  `;\n}\n\nelse if (mailSignature === \"RADHASHYAM INDUSTRIES PVT LTD\") {\n  companyBlock = `\n  <br><br>\n  <b>RADHASHYAM INDUSTRIES PVT LTD</b><br>\n  Factory Address: Bhasapul, P.O: Pursha, P.S: Galsi, Purba Bardhaman, 713406, West Bengal<br>\n  GSTIN: 19AAGCR5957G1ZW &nbsp;&nbsp; PAN: AAGCR5957G\n  `;\n}\n\n// Attach same signature to every outgoing item (email group)\nfor (const item of items) {\n  item.json.companySignature = companyBlock;\n}\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        0
+      ],
+      "id": "06f54867-bf75-4551-b585-f1f2634691d1",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Read Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Group by Party Mail Address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group by Party Mail Address": {
+      "main": [
+        [
+          {
+            "node": "Build Multiple Item Table",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Build Multiple Item Table": {
+      "main": [
+        [
+          {
+            "node": " AI – Draft RFQ Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": " AI – Draft RFQ Email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    " AI – Draft RFQ Email": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": " AI – Draft RFQ Email",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "9347b90e-15f0-4812-9233-210a9d4a7ce2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b3df56d2da60705852824a1fc3efebad486d44a8ea0dc26ae6584d3d736d0343"
+  },
+  "id": "VIqye_mc7nPSjr-5FSE9p",
+  "tags": []
+}
